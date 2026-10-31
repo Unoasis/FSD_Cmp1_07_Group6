@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 from student import Student
-
+from subject import Subject
 
 class Database:
     def __init__(self, file_name="students.data"):
@@ -20,18 +20,29 @@ class Database:
         students = []
 
         for record in data:
+            # Restore saved subjects without generating new marks or IDs.
+            enrolment_list = []
+
+            for subject_data in record["subjects"]:
+                subject = Subject.from_saved_data(
+                    subject_data["subject_id"],
+                    subject_data["mark"],
+                    subject_data["grade"]
+                )
+                enrolment_list.append(subject)
+
+            # Restore the Student with their original subjects.
             student = Student(
                 record["id"],
                 record["name"],
                 record["email"],
                 record["password"],
-                []
+                enrolment_list
             )
             students.append(student)
 
         self._students = students
         return self._students
-
 
 
     def save_to_file(self):
@@ -62,8 +73,12 @@ class Database:
             data.append(record)
 
         # 3. save all students data to JSON
-        with open(self._file_name, "w", encoding="utf-8") as file:
+        temp_file = self._file_name.with_suffix(".tmp")
+
+        with open(temp_file, "w", encoding="utf-8") as file:
             json.dump(data, file, indent=4)
+
+        temp_file.replace(self._file_name)
 
     
     def add_student(self, student):
@@ -108,13 +123,16 @@ class Database:
 if __name__ == "__main__":
     db = Database("test_students.data")
 
-    print("Before:", len(db.get_all_students()))
-
+    before = len(db.get_all_students())
     db.save_to_file()
 
     db2 = Database("test_students.data")
+    after = len(db2.get_all_students())
 
-    print("After:", len(db2.get_all_students()))
+    print("Before:", before)
+    print("After:", after)
+    print("Data preserved:", before == after)
+
 
 
 

@@ -56,7 +56,25 @@ class Subject:
 
     def __str__(self):
         return f"[ Subject::{self._subject_id} -- mark = {self._mark} -- grade = {self._grade:>3} ]"
+   
+    @classmethod
+    def from_saved_data(cls, subject_id, mark, grade):
+        """
+        Restore a Subject object from saved JSON data. (HUILIN ZENG)
 
+        Used by Database.load_from_file() to restore an existing
+        subject without generating a new ID, mark or grade.
+
+        Example:
+            subject = Subject.from_saved_data("097", 85, "HD")
+        """
+        subject = cls.__new__(cls)
+
+        subject._subject_id = subject_id
+        subject._mark = mark
+        subject._grade = grade
+
+        return subject
 
 if __name__ == "__main__":
     ids = []
@@ -70,3 +88,11 @@ if __name__ == "__main__":
     print(Subject.grade_from_mark(65) == "C")
     print(Subject.grade_from_mark(75) == "D")
     print(Subject.grade_from_mark(85) == "HD")
+
+    
+    saved = Subject.from_saved_data("097", 85, "HD")
+
+    print(saved.get_subject_id())
+    print(saved.get_mark())
+    print(saved.get_grade())
+    print(saved)
