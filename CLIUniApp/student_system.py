@@ -1,6 +1,8 @@
 
 from student import Student
 from validator import Validator
+from subject_controller import SubjectController
+
 
 
 def student_menu(database):
@@ -11,8 +13,8 @@ def student_menu(database):
             student = login_account(database)
 
             if student is not None:
-                print("Login successful")
-                print("Enrolment System is not connected yet.")
+                subject_controller = SubjectController(student, database)
+                subject_controller.run()
 
         elif choice == "r":
             register_account(database)
