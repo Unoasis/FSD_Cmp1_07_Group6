@@ -4,10 +4,19 @@ from validator import Validator
 from subject_controller import SubjectController
 
 
+# Terminal text colours
+CYAN = "\033[36m"
+RED = "\033[31m"
+YELLOW = "\033[33m"
+RESET = "\033[0m"
+GREEN = "\033[32m"
+
+TAB = "\t"
+
 
 def student_menu(database):
     while True:
-        choice = input("Student System (l/r/x): ").strip().lower()
+        choice = input(TAB + CYAN + "Student System (l/r/x): " + RESET).strip().lower()
 
         if choice == "l":
             student = login_account(database)
@@ -23,27 +32,27 @@ def student_menu(database):
             return
 
         else:
-            print("Invalid option")
+            print(TAB + RED + "Invalid option" + RESET)
 
 
 def register_account(database):
-    print("Student Sign Up")
+    print(TAB + GREEN + "Student Sign Up" + RESET)
 
     while True:
-        email = input("Email: ")
-        password = input("Password: ")
+        email = input(TAB + "Email: ")
+        password = input(TAB + "Password: ")
 
         if not Validator.validate_credentials(email, password):
-            print("Incorrect email or password format")
+            print(TAB + RED + "Incorrect email or password format" + RESET)
             continue
 
-        print("email and password formats acceptable")
+        print(TAB + YELLOW + "email and password formats acceptable" + RESET)
         break
 
     existing_student = database.find_student_by_email(email)
 
     if existing_student is not None:
-        print(f"Student {existing_student.get_name()} already exists")
+        print(f"{TAB}{RED}Student {existing_student.get_name()} already exists{RESET}")
         return
 
     name = input("Name: ")
@@ -60,29 +69,29 @@ def register_account(database):
     success = database.add_student(new_student)
 
     if success:
-        print(f"Enrolling Student {name}")
+        print(f"{TAB}{YELLOW}Enrolling Student {name}{RESET}")
     else:
-        print("Student registration failed")
+        print(TAB + RED + "Student registration failed" + RESET)
 
 
 def login_account(database):
-    print("Student Sign In")
+    print(TAB + GREEN + "Student Sign In" + RESET)
 
     while True:
-        email = input("Email: ")
-        password = input("Password: ")
+        email = input(TAB + "Email: ")
+        password = input(TAB + "Password: ")
 
         if not Validator.validate_credentials(email, password):
-            print("Incorrect email or password format")
+            print(TAB + RED + "Incorrect email or password format" + RESET)
             continue
 
-        print("email and password formats acceptable")
+        print(TAB + YELLOW + "email and password formats acceptable" + RESET)
         break
 
     student = database.find_student_by_email(email)
 
     if student is None or not student.login(password):
-        print("Student does not exist")
+        print(TAB + RED + "Student does not exist" + RESET)
         return None
 
     return student
@@ -91,6 +100,6 @@ def login_account(database):
 if __name__ == "__main__":
     from database import Database
 
-    test_database = Database("test_students.data")
+    test_database = Database("students.data")
     student_menu(test_database)
 
