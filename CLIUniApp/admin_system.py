@@ -1,17 +1,29 @@
 """The Admin System - Assessment 1 Part 2&3, Task (d)
 
-Menu actions (based on the description given):
-    (c) clear database     - clear all data on students.data
-    (g) group students     - group students by grade
-    (p) partition students - partition students into PASS/FAIL
-    (r) remove student     - remove a student by ID
-    (s) show               - show all students
-    (x) exit               - return to the university menu
+Structure follows the Part 1 class diagram:
+
+    Admin(Person)    - model class. Realises the admin backlog items:
+                       admin_access() 701, view_all_students() 502,
+                       group_by_grade() 702, categorise_pass_fail() 703,
+                       remove_student() 704, clear_all_students() 705.
+                       Admin has no fields of its own (the identity fields
+                       are inherited from Person) and depends on Database,
+                       which is passed in to each operation rather than
+                       stored, so the relationship stays a dependency.
+
+    AdminController  - drives the menu and prints. Menu actions:
+                       (c) clear database     - clear all data on students.data
+                       (g) group students     - group students by grade
+                       (p) partition students - partition students into PASS/FAIL
+                       (r) remove student     - remove a student by ID
+                       (s) show               - show all students
+                       (x) exit               - return to the university menu
 
 Every action reads from or writes to students.data through the Database class.
 Output wording and indentation follow the sample I/O exactly.
 """
 
+from person import Person
 from database import Database
 from subject import Subject
 
@@ -26,16 +38,147 @@ GRADE_ORDER = ["Z", "P", "C", "D", "HD"]
 PASS_MARK = 50
 
 
+class Admin(Person):
+    """Admin model class.
+
+    Admins already exist in the system and never register, so no Admin
+    record is written to students.data. Database is received as a method
+    parameter so that Admin keeps no fields of its own, matching the
+    Part 1 class diagram.
+    """
+
+    DEFAULT_NAME = "Admin"
+    DEFAULT_EMAIL = "admin@university.com"
+
+    def __init__(self, name=DEFAULT_NAME, email=DEFAULT_EMAIL, password=""):
+        Person.__init__(self, name, email, password)
+
+    # ------------------------------------------------------------------
+    # Backlog 701 - access the admin subsystem without registering
+    # ------------------------------------------------------------------
+
+    def admin_access(self):
+        """Admins need no login, so access is always granted."""
+        return True
+
+    # ------------------------------------------------------------------
+    # Backlog 502 - view all registered students
+    # ------------------------------------------------------------------
+
+    def view_all_students(self, database):
+        """Read the Student objects from students.data.
+
+        The brief requires the admin system to read from the file when
+        listing, grouping and partitioning, so the data is reloaded rather
+        than trusting whatever is already in memory.
+        """
+        database.load_from_file()
+        return database.get_all_students()
+
+    # ------------------------------------------------------------------
+    # Backlog 702 - group students by grade
+    # ------------------------------------------------------------------
+
+    def group_by_grade(self, database):
+        """Return {grade: [Student, ...]} for every student on file."""
+        groups = {}
+
+        for student in self.view_all_students(database):
+            grade = Admin.get_grade(student)
+            groups.setdefault(grade, []).append(student)
+
+        return groups
+
+    # ------------------------------------------------------------------
+    # Backlog 703 - categorise students into PASS / FAIL
+    # ------------------------------------------------------------------
+
+    def categorise_pass_fail(self, database):
+        """Return (passed, failed) lists of Students."""
+        passed = []
+        failed = []
+
+        for student in self.view_all_students(database):
+            if Admin.has_passed(student):
+                passed.append(student)
+            else:
+                failed.append(student)
+
+        return passed, failed
+
+    # ------------------------------------------------------------------
+    # Backlog 704 - remove an individual student
+    # ------------------------------------------------------------------
+
+    def remove_student(self, database, student_id):
+        """Remove one student from students.data.
+
+        Returns the Student that was removed, or None when no student has
+        that ID. A plain "12345" is accepted for a stored ID of "012345".
+        """
+        students = self.view_all_students(database)
+
+        target = database.find_student(student_id)
+        if target is None:
+            target = database.find_student(str(student_id).zfill(6))
+
+        if target is None:
+            return None
+
+        remaining = []
+        for student in students:
+            if student.get_id() != target.get_id():
+                remaining.append(student)
+
+        Admin.save_students(database, remaining)
+        return target
+
+    # ------------------------------------------------------------------
+    # Backlog 705 - clear all student records
+    # ------------------------------------------------------------------
+
+    def clear_all_students(self, database):
+        """Empty students.data."""
+        Admin.save_students(database, [])
+
+    # ------------------------------------------------------------------
+    # Helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def save_students(database, students):
+        """Save `students` as the new contents of students.data.
+
+        Database has add_student() and update_student() but no method for
+        removing or clearing, so the admin system replaces the student list
+        the Database is holding and asks it to save. The file itself is
+        still only ever written by Database.save_to_file(), so students.data
+        keeps a single writer.
+        """
+        database._students = students
+        database.save_to_file()
+
+    @staticmethod
+    def get_grade(student):
+        """Grade of a student, worked out from their average mark."""
+        return Subject.grade_from_mark(student.get_average_mark())
+
+    @staticmethod
+    def has_passed(student):
+        return student.get_average_mark() >= PASS_MARK
+
+
 class AdminController:
-    """Drives the admin subsystem menu."""
+    """Drives the admin subsystem menu and prints the output."""
 
     CYAN = "\033[36m"
     RED = "\033[31m"
     YELLOW = "\033[33m"
     RESET = "\033[0m"
 
-    def __init__(self, database=None):
+    def __init__(self, database=None, admin=None):
         self.database = database if database is not None else Database()
+        self.admin = admin if admin is not None else Admin()
 
     # ------------------------------------------------------------------
     # Menu loop
@@ -43,6 +186,10 @@ class AdminController:
 
     def run(self):
         """Show the admin menu until the admin chooses (x) exit."""
+        if not self.admin.admin_access():
+            self.print_error("Admin access denied.")
+            return
+
         while True:
             try:
                 choice = input(
@@ -74,7 +221,7 @@ class AdminController:
     def show_students(self):
         self.print_info("Student List")
 
-        students = self.read_students()
+        students = self.admin.view_all_students(self.database)
         if not students:
             self.print_nothing_to_display()
             return
@@ -92,22 +239,19 @@ class AdminController:
     def group_students(self):
         self.print_info("Grade Grouping")
 
-        students = self.read_students()
-        if not students:
+        groups = self.admin.group_by_grade(self.database)
+        if not groups:
             self.print_nothing_to_display()
             return
-
-        groups = {}
-        for student in students:
-            grade = self.get_grade(student)
-            groups.setdefault(grade, []).append(self.format_with_grade(student))
 
         # Known grades first, in band order, then anything unexpected.
         ordered = [g for g in GRADE_ORDER if g in groups]
         ordered += [g for g in groups if g not in GRADE_ORDER]
 
         for grade in ordered:
-            entries = ", ".join(groups[grade])
+            entries = ", ".join(
+                self.format_with_grade(student) for student in groups[grade]
+            )
             print(f"{TAB}{grade:<2} --> [{entries}]")
 
     # ------------------------------------------------------------------
@@ -117,21 +261,12 @@ class AdminController:
     def partition_students(self):
         self.print_info("PASS/FAIL Partition")
 
-        students = self.read_students()
-
-        failed = []
-        passed = []
-
-        for student in students:
-            if self.has_passed(student):
-                passed.append(self.format_with_grade(student))
-            else:
-                failed.append(self.format_with_grade(student))
+        passed, failed = self.admin.categorise_pass_fail(self.database)
 
         # Note: unlike show/group, the sample prints empty brackets here when
         # the database is empty rather than "< Nothing to Display >".
-        print(f"{TAB}FAIL --> [{', '.join(failed)}]")
-        print(f"{TAB}PASS --> [{', '.join(passed)}]")
+        print(f"{TAB}FAIL --> [{self.format_list(failed)}]")
+        print(f"{TAB}PASS --> [{self.format_list(passed)}]")
 
     # ------------------------------------------------------------------
     # (r) Remove a student by ID
@@ -152,30 +287,17 @@ class AdminController:
             self.print_error(f"Student {student_id} does not exist")
             return
 
-        # Accept "12345" for a stored id of "012345" without losing the
-        # padded form the sample output uses.
-        padded_id = student_id.zfill(6)
+        try:
+            removed = self.admin.remove_student(self.database, student_id)
+        except (OSError, ValueError):
+            self.print_error("Unable to update students.data")
+            return
 
-        # Read the current file contents before looking the student up.
-        students = self.read_students()
-
-        target = self.database.find_student(student_id)
-        if target is None:
-            target = self.database.find_student(padded_id)
-
-        if target is None:
+        if removed is None:
             self.print_error(f"Student {student_id} does not exist")
             return
 
-        remaining = []
-        for student in students:
-            if student.get_id() != target.get_id():
-                remaining.append(student)
-
-        if self.write_students(remaining):
-            self.print_info(f"Removing Student {target.get_id()} Account")
-        else:
-            self.print_error("Unable to update students.data")
+        self.print_info(f"Removing Student {removed.get_id()} Account")
 
     # ------------------------------------------------------------------
     # (c) Clear the database
@@ -196,55 +318,19 @@ class AdminController:
                 return
 
             if confirm == "Y":
-                if self.write_students([]):
-                    self.print_info("Students data cleared")
-                else:
+                try:
+                    self.admin.clear_all_students(self.database)
+                except (OSError, ValueError):
                     self.print_error("Unable to clear students.data")
+                    return
+
+                self.print_info("Students data cleared")
                 return
 
             if confirm == "N":
                 return
 
             self.print_error("Please answer Y or N")
-
-    # ------------------------------------------------------------------
-    # Data helpers
-    # ------------------------------------------------------------------
-
-    def read_students(self):
-        """Re-read the Student objects from students.data.
-
-        The brief requires the admin system to read from the file when
-        listing, grouping and partitioning, so the data is reloaded rather
-        than trusting whatever is already in memory.
-        """
-        self.database.load_from_file()
-        return self.database.get_all_students()
-
-    def write_students(self, students):
-        """Save `students` as the new contents of students.data.
-
-        Database has add_student() and update_student() but no method for
-        removing or clearing, and database.py belongs to another team member,
-        so the admin system replaces the student list the Database is holding
-        and asks it to save. The file itself is still only ever written by
-        Database.save_to_file(), so students.data keeps a single writer.
-        """
-        try:
-            self.database._students = students
-            self.database.save_to_file()
-            return True
-        except (OSError, ValueError):
-            return False
-
-    @staticmethod
-    def get_grade(student):
-        """Grade of a student, worked out from their average mark."""
-        return Subject.grade_from_mark(student.get_average_mark())
-
-    @staticmethod
-    def has_passed(student):
-        return student.get_average_mark() >= PASS_MARK
 
     # ------------------------------------------------------------------
     # Formatting helpers
@@ -257,9 +343,12 @@ class AdminController:
         """
         return (
             f"{student.get_name()} :: {student.get_id()} --> "
-            f"GRADE:  {self.get_grade(student)} - "
+            f"GRADE:  {Admin.get_grade(student)} - "
             f"MARK: {student.get_average_mark():.2f}"
         )
+
+    def format_list(self, students):
+        return ", ".join(self.format_with_grade(student) for student in students)
 
     def print_info(self, message):
         print(f"{TAB}{self.YELLOW}{message}{self.RESET}")
