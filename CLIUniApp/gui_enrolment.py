@@ -15,7 +15,7 @@ class EnrolmentWindow:
         self.window = tk.Toplevel(root)
         self.window.title("Student Enrolment")
         self.window.geometry("500x330")
-        self.window.resizable(False, False)
+        self.window.resizable(True, True)
         self.window.protocol("WM_DELETE_WINDOW", self.close_window)
 
         self.build_interface()
