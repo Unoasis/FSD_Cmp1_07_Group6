@@ -72,7 +72,7 @@ class CLIUniApp:
             print("Admin System is not connected yet.")
             return
 
-        handler == getattr(admin_controller, "admin_menu", None)
+        handler = getattr(admin_controller, "admin_menu", None)
         if not callable(handler):
             print("admin_controller.py needs an admin_menu(database) function.")
             return
