@@ -23,7 +23,8 @@ Both applications share the same backend classes and store student and enrolment
 <pre>
 UniApp/
 ├── __pycache__/           # Python-generated cache files
-├── admin_system.py        # Admin management functions
+├── admin.py               # Admin model (view, group, partition, remove, clear)
+├── admin_controller.py    # Admin menu and output
 ├── CLIUniApp.py           # CLI entry point and University menu
 ├── database.py            # JSON data storage and retrieval
 ├── gui_enrolment.py       # GUI enrolment window
@@ -46,7 +47,7 @@ UniApp/
 | Team Member | Main Contributions |
 |---|---|
 | Huilin Zeng | Student System, Database and JSON data management, GUIUniApp (Login Window and Exception Window). |
-| Sheyda Niaparast |  |
+| Sheyda Niaparast | Admin System: `Admin` model and `AdminController` (show, group, partition, remove and clear students), error handling, sample I/O formatting and integration with `CLIUniApp`. |
 | Chengfeng Yang | University System (CLIUniApp entry point, menu routing and the shared Database), GUIUniApp (Enrolment Window and Subject Window). |
 | Sihan Yin |  |
 
@@ -132,7 +133,36 @@ I tested valid and invalid registration details, duplicate emails, login failure
 
 ### d. The Admin System (Sheyda Niaparast)
 
-*To be completed by the responsible team member.*
+#### Implementation and Main Functions
+
+I was responsible for the Admin System. Admins already exist, so there is no login: from the University menu an admin goes straight to the Admin System and can show all students, group them by grade, partition them into PASS/FAIL, remove a student by ID, or clear the database. I split the work into `admin.py` (the `Admin` model) and `admin_controller.py` (the `AdminController`), following the Model and Controller structure recommended in the brief.
+
+**1. Admin Model (`admin.py`)**
+
+`Admin` inherits from `Person` and has no printing or input. The `Database` is passed into each method rather than stored, so `Admin` only depends on `Database`, as in our Part 1 class diagram.
+
+- `view_all_students()` reloads `students.data` and returns the students, so the admin always sees the latest saved data.
+- `group_by_grade()` returns `{grade: [Student, ...]}`. The grade comes from `Subject.grade_from_mark()` using the student's average mark, so the grade rules are only defined in one place.
+- `categorise_pass_fail()` returns the passed and failed students. A student passes when the average mark is at least `PASS_MARK` (50).
+- `remove_student()` finds the student by ID, saves the remaining students and returns the removed one, or `None` if the ID does not exist. It also accepts a short ID such as `12345` for `012345`.
+- `clear_all_students()` saves an empty list to empty the file.
+- `admin_access()` always returns `True`, because admins do not log in.
+
+**2. Admin Controller (`admin_controller.py`)**
+
+`AdminController.run()` shows the `Admin System (c/g/p/r/s/x)` menu and calls one method per option until the admin enters `x`. It reads the input, calls `Admin`, and prints the results with the same wording, colours, tab indentation and two-decimal marks as the sample I/O. Show and group print `< Nothing to Display >` when there are no students, while partition prints `FAIL --> []` and `PASS --> []`, as in the sample. Clearing asks for a `(Y)ES/(N)O` confirmation first. `admin_menu(database)` is the entry point that `CLIUniApp.py` calls.
+
+**3. File Management**
+
+The Admin System never opens `students.data` directly. It reads with `Database.load_from_file()` and writes with `Database.save_to_file()`. `Database` has no remove or clear method, so `Admin.save_students()` replaces the student list held by the `Database` and then saves it. A cleaner version would add `remove_student()` and `clear()` to `Database`.
+
+**4. Error Handling**
+
+Invalid menu options, empty or non-numeric IDs, and IDs that do not exist all show an error message. Clearing only happens on `Y`. File write errors show a message instead of crashing, and Ctrl+C or Ctrl+D returns to the previous menu.
+
+#### Testing and Integration
+
+I tested the Admin System through the University menu with students in different grade bands. I checked show, group and partition output, removing an existing, missing, empty and non-numeric ID, clearing with `N`, an invalid answer and `Y`, all views on an empty database, and that a removed student stays removed after restarting. The Admin System shares one `Database` with the Student System, so newly registered or enrolled students appear straight away in the admin views, and a removed student can no longer log in.
 
 ### e. GUIUniApp (Huilin Zeng, Chengfeng Yang)
 
@@ -174,6 +204,8 @@ I implemented the Exception Window in `gui_errors.py` using Tkinter's `Toplevel`
 
 ## 5. Program Execution Instructions
 
+**Requirements:** Python 3 with Tkinter, which is included with the standard Python installer. The project only uses the Python standard library, so no extra libraries need to be installed.
+
 During integration testing, group members ran the complete application on their own computers. We found that launching the program from different working directories could create or read `students.data` in the wrong place, so stored data was not always the same when retrieved.
 
 To fix this, we changed the Database to build the path to `students.data` from the location of `database.py` instead of the current working directory. The CLI and GUI applications now read the same data file wherever the program is launched.
@@ -201,9 +233,17 @@ The project uses two data files:
 - `students.data` holds the student and enrolment data the application uses.
 - `test_students.data` holds sample records for development and testing.
 
-We used the test file to check database operations without touching the main application data. The tests covered student registration, searching, updating records, saving and loading enrolled subjects, and data consistency after reloading. Both files are in JSON format.
+We used the test file to check database operations without touching the main application data. The tests covered student registration, searching, updating records, saving and loading enrolled subjects, and data consistency after reloading. The Admin System was also tested through the University menu using students in different grade bands (see section 4d). Both files are in JSON format.
 
 ## 7. Project Notes
+
+The code follows the Model, View and Controller structure recommended in the brief:
+
+- **Model:** `Person`, `Student`, `Subject`, `Database` and `Admin` hold the data and the rules.
+- **Controller:** `AdminController`, `SubjectController` and the functions in `student_system.py` handle the menus and call the model classes.
+- **View:** the CLI menus and output in `CLIUniApp.py` and the controllers, and the Tkinter windows in `GUIUniApp.py`, `gui_enrolment.py`, `gui_subjects.py` and `gui_errors.py`.
+
+`Validator` provides input validation and student ID generation for both interfaces.
 
 The team developed the application on GitHub. Each member worked on assigned modules, which were then integrated into one application.
 
