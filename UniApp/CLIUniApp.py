@@ -65,16 +65,16 @@ class CLIUniApp:
             return
 
         try:
-            import admin_system
+            import admin_controller
         except ModuleNotFoundError as exc:
-            if exc.name != "admin_system":
+            if exc.name != "admin_controller":
                 raise
             print("Admin System is not connected yet.")
             return
 
-        handler = getattr(admin_system, "admin_menu", None)
+        handler == getattr(admin_controller, "admin_menu", None)
         if not callable(handler):
-            print("admin_system.py needs an admin_menu(database) function.")
+            print("admin_controller.py needs an admin_menu(database) function.")
             return
         handler(self._database)
 
