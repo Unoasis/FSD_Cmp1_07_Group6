@@ -47,7 +47,7 @@ UniApp/
 |---|---|
 | Huilin Zeng | Student System, Database and JSON data management, GUIUniApp (Login Window and Exception Window). |
 | Sheyda Niaparast |  |
-| Chengfeng Yang |  |
+| Chengfeng Yang | University System (CLIUniApp entry point, menu routing and the shared Database), GUIUniApp (Enrolment Window and Subject Window). |
 | Sihan Yin |  |
 
 ## 4. Implementation Details
@@ -56,7 +56,39 @@ This section follows the Assessment 1 Part 2 marking scheme.
 
 ### a. The University System (Chengfeng Yang)
 
-*To be completed by the responsible team member.*
+#### Implementation and Main Functions
+
+I was responsible for the University System in `CLIUniApp.py`, the entry point of the CLI application. It shows the main menu, sends the user to the Admin System or the Student System, and creates the Database that every menu shares.
+
+**1. Main Menu and Navigation**
+
+`run()` shows `University System: (A)dmin, (S)tudent, or X :` in cyan and reads the user's choice in a loop. The input is stripped and converted to lower case, so `A`, `a` and ` a ` are all accepted. `A` calls `admin_menu()`, `S` calls `student_menu()`, and `X` prints `Thank You` in yellow and ends the program. Any other input shows a red error message and the menu appears again.
+
+When the user leaves a submenu with `x`, that function returns and control goes back to the loop in `run()`. This is how users move back and forth between the menus.
+
+**2. Shared Database**
+
+The constructor creates one `Database` object and stores it in the private attribute `_database`, which matches the composition relationship between CLIUniApp and Database in our Part 1 class diagram. The same object is passed to `student_system.student_menu(database)` and `admin_system.admin_menu(database)`.
+
+During integration testing we found that two separate Database objects overwrote each other's changes, because each one keeps its own list of students in memory and saves that list over the file. With one shared object, a student registered in the Student System appears straight away in the Admin System, and a student removed by the admin can no longer log in.
+
+**3. Connecting the Submenus**
+
+`student_menu()` and `admin_menu()` import the teammates' modules inside the method rather than at the top of the file. While the other systems were still being written, the University System could still run and print "not connected yet" instead of crashing. The method checks `exc.name`, so only a missing submenu file is treated this way; if a submenu file exists but a module it needs is missing, the error is raised again so real problems stay visible.
+
+The constructor also accepts optional `student_handler` and `admin_handler` functions. I used them to test the menu routing with simple stand-in functions before the real submenus were finished. In the final program they are not passed, so the real modules are used.
+
+**4. Error Handling and Output**
+
+The `input()` call in the main menu is wrapped in `try/except` for `EOFError` and `KeyboardInterrupt`, so pressing Ctrl+D or Ctrl+C at the main menu prints `Thank You` and exits cleanly instead of showing a traceback.
+
+Colours use ANSI escape codes: cyan (36) for the menu prompt, yellow (33) for `Thank You`, red (31) for errors, and 0 to reset. The reset code at the end of the prompt keeps the user's typing in the normal colour. The prompt text, colours and indentation follow the sample I/O.
+
+#### Testing and Integration
+
+Before the other systems were ready, I tested the routing with stand-in submenus: upper- and lower-case options, extra spaces, invalid options, empty input, and Ctrl+C and Ctrl+D at the main menu.
+
+After the Student, Subject Enrolment and Admin Systems were finished, I ran the full sample I/O scenario from `CLIUniApp.py`, covering registration, login, enrolment, admin actions and exit, and compared the text, colours and indentation with the sample line by line. I also checked that all menus received the same Database object and that changes made in one menu were visible in the others.
 
 ### b. The Student System (Huilin Zeng)
 
@@ -114,11 +146,27 @@ I reused the existing backend classes instead of writing separate login and data
 
 #### 2. Enrolment Window (Chengfeng Yang)
 
-*To be completed by Chengfeng Yang.*
+I built the Enrolment Window in `gui_enrolment.py` as an `EnrolmentWindow` class. After a successful login, the Login Window hides itself with `withdraw()` and calls `show_enrolment_window(root, student, database)`, which creates this class. The window is a `Toplevel` of the root window, because a Tkinter program should have only one `Tk()` root and one event loop.
+
+The window shows the student's name and ID, the number of enrolled subjects ("Currently enrolled: n / 4 subjects", updated through a `StringVar`) and a `ttk.Progressbar`. It has three buttons: Enrol, Show Subjects and Logout.
+
+When the student clicks Enrol, the window calls `student.enrol_subject()`. The four-subject limit is checked inside the Student class rather than in the GUI, so the CLI and GUI follow the same rule. If the student already has four subjects, the method returns `None` and the window calls `show_error()` to open the Exception Window with "Students are allowed to enrol in 4 subjects only." The Enrol button stays active on purpose, so the Exception Window appears when a student tries to enrol in a fifth subject.
+
+Otherwise the new subject is saved straight away with `database.update_student()`. If saving fails, the window removes the new subject again and shows an error, so the window and `students.data` never disagree.
+
+Error windows use the Enrolment Window as their parent, not the root. After login the root window is withdrawn, and we found during testing that an error window attached to it would stay hidden while still blocking input, making the program look frozen.
+
+The Logout button and the window's close button (bound with `protocol("WM_DELETE_WINDOW", ...)`) both call `close_window()`. It closes the Subject Window if it is open, destroys the Enrolment Window and shows the Login Window again with `deiconify()`, so another student can log in.
 
 #### 3. Subject Window (Chengfeng Yang)
 
-*To be completed by Chengfeng Yang.*
+I built the Subject Window in `gui_subjects.py` as a `SubjectWindow` class. It lists the logged-in student's enrolled subjects in a `ttk.Treeview` table with three columns: Subject ID, Mark and Grade. Below the table it shows the number of subjects and the average mark, or "No subjects enrolled yet." when the list is empty.
+
+`refresh()` deletes every row and inserts one row for each subject in `student.get_enrolment_list()`, so rows are never duplicated. The data comes from the same Student object that the Enrolment Window has just saved, so the table always matches `students.data`.
+
+The Enrolment Window keeps a reference to the open Subject Window. Clicking Show Subjects again refreshes and raises the existing window instead of opening a second one, and the table refreshes automatically after each successful enrolment. When the Subject Window is closed, an `on_close` callback tells the Enrolment Window. Its parent is the Enrolment Window, so it also closes when the student logs out.
+
+I tested both windows by enrolling one to four subjects, attempting a fifth, refreshing the table while it was open, logging in with a student who already had four subjects, and logging out and back in as another student. I also checked that the IDs, marks and grades shown in the GUI matched `students.data` and the CLI's subject list.
 
 #### 4. Exception Window (Huilin Zeng)
 
