@@ -49,7 +49,7 @@ UniApp/
 | Huilin Zeng | Student System, Database and JSON data management, GUIUniApp (Login Window and Exception Window). |
 | Sheyda Niaparast | Admin System: `Admin` model and `AdminController` (show, group, partition, remove and clear students), error handling, sample I/O formatting and integration with `CLIUniApp`. |
 | Chengfeng Yang | University System (CLIUniApp entry point, menu routing and the shared Database), GUIUniApp (Enrolment Window and Subject Window). |
-| Sihan Yin |  |
+| Sihan Yin | Subject Enrolment System: `SubjectController`, the `Subject` class. |
 
 ## 4. Implementation Details
 
@@ -129,7 +129,30 @@ I tested valid and invalid registration details, duplicate emails, login failure
 
 ### c. The Subject Enrolment System (Sihan Yin)
 
-*To be completed by the responsible team member.*
+#### Implementation and Main Functions
+
+I was responsible for the Subject Enrolment System, which a student enters after logging in. I implemented the `Subject` class, the enrolment methods in `Student`, and `SubjectController`, which runs the `Student Course Menu (c/e/r/s/x)`.
+
+**1. Subject and Enrolment Rules**
+
+A new `Subject` gets a unique three-digit ID (001 to 999), a random mark between 25 and 100, and a grade from `grade_from_mark()`. `Student.enrol_subject()` returns `None` when the student already has four subjects (`MAX_SUBJECTS`), and otherwise adds the new subject. `remove_subject()` removes a subject by ID, and the average mark is re-calculated after every enrolment or removal.
+
+**2. Subject Controller**
+
+`SubjectController.run()` shows the menu and calls one method per option until the student enters `x`:
+
+- **Enrol (e):** enrols, saves, and prints the new enrolment count. A fifth enrolment prints `Students are allowed to enrol in 4 subjects only`.
+- **Remove (r):** removes a subject by ID and prints the new enrolment count.
+- **Show (s):** prints the number of subjects, then each subject with its mark and grade.
+- **Change password (c):** validates the new password and repeats the confirmation until the two match. The same password may be reused.
+
+**3. File Management and Error Handling**
+
+After every enrolment, removal or password change, the controller calls `Database.update_student()`, so the change is saved to `students.data` straight away. Invalid menu options, a fifth enrolment, a non-numeric or unknown subject ID, an invalid password and mismatched passwords all show an error message and return to the menu.
+
+#### Testing and Integration
+
+I tested enrolling up to and beyond four subjects, showing, removing existing and missing subjects, password changes with invalid and mismatched input, and that data was still there after saving and reloading. The Student System opens this menu after login, and the Admin System and GUI use the same data.
 
 ### d. The Admin System (Sheyda Niaparast)
 
