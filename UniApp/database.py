@@ -5,7 +5,7 @@ from subject import Subject
 
 class Database:
     def __init__(self, file_name="students.data"):
-        self._file_name = Path(file_name)
+        self._file_name = Path(__file__).resolve().parent / file_name
         self._students = []
 
         if not self._file_name.exists():
